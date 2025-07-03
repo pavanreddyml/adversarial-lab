@@ -15,10 +15,9 @@ if TYPE_CHECKING:
         from adversarial_lab.core.tensor_ops.tensor_torch import TensorOpsTorch
     except ImportError:
         torch = None
-
-    from adversarial_lab.core.tensor_ops.tensor_numpy import TensorOpsNumpy
-
+        
     
+    from adversarial_lab.core.tensor_ops.tensor_numpy import TensorOpsNumpy
 
 TensorType = Union["tf.Tensor", "torch.Tensor", "np.ndarray"]
 TensorVariableType = Union["tf.Variable", "torch.Tensor", "np.ndarray"]

@@ -25,7 +25,8 @@ class SqlliteDB:
     def create_table(self, 
                      table_name: str, 
                      schema: dict, 
-                     force: bool = False
+                     force: bool = False,
+                     primary_key_col_name: str = "id"
                      ) -> None:
         self.cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (table_name,)
@@ -38,9 +39,12 @@ class SqlliteDB:
                 self.delete_table(table_name)
             else:
                 raise ValueError(f"Table '{table_name}' already exists. Use force=True to delete and recreate it.")
+        
 
-        columns = []
+        columns = [f"{primary_key_col_name} INTEGER PRIMARY KEY AUTOINCREMENT"]
         for column_name, column_type in schema.items():
+            if column_name == primary_key_col_name:
+                raise ValueError(f"Column name '{primary_key_col_name}' is reserved for primary key. Please choose a different name for columns.")
             if column_type not in self.db_types:
                 raise ValueError(f"Unsupported column type: {column_type}")
             columns.append(f"{column_name} {self.db_types[column_type]}")

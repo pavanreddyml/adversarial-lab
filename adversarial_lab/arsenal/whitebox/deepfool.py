@@ -1,7 +1,7 @@
 from ..attacks_base import AttacksBase
 
 from adversarial_lab.attacker.whitebox import WhiteBoxMisclassification
-from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator
+from adversarial_lab.core.noise_generators.tensor import AdditiveNoiseGenerator
 from adversarial_lab.core.losses import CategoricalCrossEntropy, BinaryCrossEntropy
 from adversarial_lab.core.optimizers import PGD
 from adversarial_lab.core.constraints import POClip

@@ -1,4 +1,4 @@
-from . import Optimizer
+from adversarial_lab.core.optimizers import Optimizer
 
 
 class PGD(Optimizer):

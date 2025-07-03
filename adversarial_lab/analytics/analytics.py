@@ -2,8 +2,9 @@ import warnings
 
 from adversarial_lab.db import DB
 from adversarial_lab.analytics import Tracker
+from adversarial_lab.analytics import CustomFieldsTracker
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 
 class AdversarialAnalytics:
@@ -11,7 +12,8 @@ class AdversarialAnalytics:
                  db: Optional[DB] = None,
                  trackers: Optional[List[Tracker]] = None,
                  table_name: Optional[str] = None,
-                 force_create_table: bool = False) -> None:
+                 force_create_table: bool = False,
+                 primary_key_col_name: str = "id") -> None:
         """
         Tracks various metrics during the attack process.
 
@@ -44,7 +46,7 @@ class AdversarialAnalytics:
             self.trackers = []
             self.table_name = None
             return
-        
+
         if table_name is None:
             raise ValueError("Table name must be provided.")
 
@@ -56,8 +58,12 @@ class AdversarialAnalytics:
             raise TypeError("All trackers must be of type 'Tracker'")
         self.trackers = trackers
 
+        if len([tracker for tracker in self.trackers if isinstance(tracker, CustomFieldsTracker)]) > 1:
+            raise ValueError(
+                "Only one CustomFieldsTracker can exist in the trackers list. Please ensure only one instance is present.")
+
         self.table_name = table_name
-        self._initialize(force_create_table)
+        self._initialize(force_create_table, primary_key_col_name)
 
         self.warned = {}
 
@@ -65,6 +71,9 @@ class AdversarialAnalytics:
         """
         Resets the values of all trackers. Called at the beginning of each epoch to reset the values of all trackers.
         """
+        if not self.db:
+            return
+        
         for tracker in self.trackers:
             tracker.reset_values()
 
@@ -74,6 +83,9 @@ class AdversarialAnalytics:
         """
         Updates the values of all trackers before staring attack. Tracks data befor the attack process begins.
         """
+        if not self.db:
+            return
+        
         for tracker in self.trackers:
             tracker.pre_attack(*args, **kwargs)
 
@@ -84,6 +96,9 @@ class AdversarialAnalytics:
         """
         Updates the values of all trackers after each batch if track_batch is True. Called after each batch during the attack process.
         """
+        if not self.db:
+            return
+        
         for tracker in self.trackers:
             tracker.post_batch(batch_num, *args, **kwargs)
 
@@ -93,6 +108,9 @@ class AdversarialAnalytics:
         """
         Updates the values of all trackers after each epoch if track_epoch is True. Called after each epoch during the attack process.
         """
+        if not self.db:
+            return
+        
         for tracker in self.trackers:
             tracker.post_epoch(*args, **kwargs)
 
@@ -100,11 +118,18 @@ class AdversarialAnalytics:
                                   *args,
                                   **kwargs) -> None:
         """
-        Updates the values of all trackers after the attack. Called after the attack process ends."""
+        Updates the values of all trackers after the attack. Called after the attack process ends.
+        """
+        if not self.db:
+            return
+        
         for tracker in self.trackers:
             tracker.post_attack(*args, **kwargs)
 
-    def _initialize(self, force_create_table: bool) -> None:
+    def _initialize(self, 
+                    force_create_table: bool,
+                    primary_key_col_name: str = "id"
+                    ) -> None:
         """
         Initializes the database connection, trackers, and creates a table with the necessary columns.
 
@@ -126,7 +151,9 @@ class AdversarialAnalytics:
 
         self.db.create_table(table_name=self.table_name,
                              schema=columns,
-                             force=force_create_table)
+                             force=force_create_table,
+                             primary_key_col_name=primary_key_col_name
+                             )
 
     def write(self,
               epoch_num: int
@@ -157,3 +184,15 @@ class AdversarialAnalytics:
                 return
             warnings.warn(f"Failed to connect to the database: {e}")
             self.warned["connection_error"] = True
+
+    def set_custom_field_values(self,
+                                values: Dict[str, Any]) -> None:
+        """
+        Sets the custom fields for the CustomFieldsTracker.
+
+        Args:
+            field_values (dict): A dictionary of field names and their values.
+        """
+        for tracker in self.trackers:
+            if isinstance(tracker, CustomFieldsTracker):
+                tracker.set_values(values)

@@ -1,5 +1,5 @@
 from .noise_generator_base import NoiseGenerator
-from .additive_noise_generator import AdditiveNoiseGenerator
-from .pixel_noise_generator import PixelNoiseGenerator
+from .tensor import TensorNoiseGenerator
+from .text import TextNoiseGenerator
 
-__all__ = ["NoiseGenerator", "AdditiveNoiseGenerator", "PixelNoiseGenerator"]
+__all__ = ["NoiseGenerator", "TensorNoiseGenerator", "TextNoiseGenerator"]

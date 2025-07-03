@@ -8,11 +8,12 @@ from . import BlackBoxAttack
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
-from adversarial_lab.core.gradient_estimator import GradientEstimator
-from adversarial_lab.analytics import AdversarialAnalytics
+from adversarial_lab.exceptions import VectorDimensionsError
 from adversarial_lab.core.noise_generators import NoiseGenerator
+from adversarial_lab.analytics import AdversarialAnalytics, Tracker
+from adversarial_lab.core.gradient_estimator import GradientEstimator
 from adversarial_lab.core.constraints import PostOptimizationConstraint
-from adversarial_lab.exceptions import VectorDimensionsError, IncompatibilityError
+from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator
 
 from typing import Optional, List, Callable, Literal, Union
 
@@ -21,6 +22,14 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
     """
     BlackBoxMisclassificationAttack generates adversarial examples that force misclassification.
     """
+
+    @property
+    def _compatible_noise_generators(self) -> List[NoiseGenerator]:
+        return (TensorNoiseGenerator, )
+
+    @property
+    def _compatible_trackers(self) -> List[Tracker]:
+        return ()
 
     def __init__(self,
                  predict_fn: Callable,
@@ -55,12 +64,10 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
                strategy: Literal['spread', 'uniform', 'random'] = "random",
                binary_threshold: float = 0.5,
                epochs=10,
-               addn_analytics_fields: Optional[dict] = None,
                *args,
                **kwargs
                ) -> np.ndarray:
         super().attack(epochs, *args, **kwargs)
-        addn_analytics_fields = addn_analytics_fields or {}
 
         sample_to_attack, predictions, noise_meta, target_vector, true_class, target_class, query_type = self._initialize_attack(
             sample=sample,
@@ -83,14 +90,13 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
             noise=self.noise_generator.get_noise(noise_meta),
             predictions=self.tensor_ops.remove_batch_dim(predictions),
             on_original=True,
-            **addn_analytics_fields
         )
 
         for epoch in range(epochs):
             grads, jacobian, logits, preds = self.model.calculate_gradients(
                 sample=sample_to_attack,
                 noise=noise_meta,
-                construct_perturbation_fn=self.noise_generator.construct_perturbation,
+                construct_perturbation_fn=self.noise_generator.construct_noise,
                 target_vector=target_vector,
                 loss=self.loss
                 )
@@ -110,7 +116,7 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
             self._apply_constrains(noise_meta, sample_to_attack)
 
             # Stats
-            predictions = self.model.predict(x=[sample_to_attack+self.noise_generator.construct_perturbation(noise_meta)])[0]
+            predictions = self.model.predict(x=[sample_to_attack+self.noise_generator.construct_noise(noise_meta)])[0]
 
             self._update_progress_bar(
                 predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
@@ -128,7 +134,6 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
                 predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
                     predictions)),
                 on_original=True,
-                **addn_analytics_fields
             )
 
             callbacks_data = self._apply_callbacks(
@@ -148,7 +153,6 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
             noise=self.noise_generator.get_noise(noise_meta),
             predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=True,
-            **addn_analytics_fields
         )
 
         return self.noise_generator.get_noise(noise_meta), noise_meta
@@ -172,12 +176,12 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
         noise_meta = self.noise_generator.generate_noise_meta(sample_to_attack)
 
         predictions = self.model.predict(
-            x=[sample_to_attack+self.noise_generator.construct_perturbation(noise_meta)])[0]  # Testing if noise can be applied to the preprocessed image
+            x=[sample_to_attack+self.noise_generator.construct_noise(noise_meta)])[0]  # Testing if noise can be applied to the preprocessed image
         predictions = self.model.predict(x=[sample_to_attack])
 
         if not isinstance(predictions, list):
             raise TypeError(
-                "`predict_fn` must return List[np.ndarray] or a List[Tuple[Tuple[preciction_class, prediction_confidence]]].")
+                "`predict_fn` must return List[np.ndarray] or a List[Tuple[Tuple[prediction_class, prediction_confidence]]].")
         predictions = predictions[0]
 
         if not isinstance(predictions, np.ndarray) and not isinstance(predictions, tuple):

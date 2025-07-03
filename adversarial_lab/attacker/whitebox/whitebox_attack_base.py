@@ -10,12 +10,13 @@ from adversarial_lab.callbacks import *
 from adversarial_lab.core import ALModel
 from adversarial_lab.attacker import AttackerBase
 from adversarial_lab.core.tensor_ops import TensorOps
-from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.core.losses import Loss, LossRegistry
+from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
 from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
-from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
+from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator, TextNoiseGenerator
+from adversarial_lab.core.noise_generators.tensor import AdditiveNoiseGenerator
 
 from typing import Union, List, Optional, Literal
 from adversarial_lab.core.types import TensorType
@@ -25,6 +26,22 @@ class WhiteBoxAttack(AttackerBase):
     """
     Base class for white-box adversarial attack. Subclasses must implement specific attack methods.
     """
+
+    @property
+    def _compatible_noise_generators(self) -> List[NoiseGenerator]:
+        """
+        Returns a list of compatible noise generator names for this attack.
+        Subclasses should override this property to specify compatible noise generators.
+        """
+        return ()
+
+    @property
+    def _compatible_trackers(self) -> List[Tracker]:
+        """
+        Returns a list of compatible optimizer names for this attack.
+        Subclasses should override this property to specify compatible optimizers.
+        """
+        return ()
 
     def __init__(self,
                  model: ALModel,

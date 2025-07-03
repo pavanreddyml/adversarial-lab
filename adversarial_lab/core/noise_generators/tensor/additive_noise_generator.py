@@ -1,13 +1,12 @@
-from typing import Literal, List, Union
-
 import numpy as np
 
-from .noise_generator_base import NoiseGenerator
+from .tensor_noise_generator_base import TensorNoiseGenerator
 
+from typing import Literal, List, Union
 from adversarial_lab.core.types import TensorType, TensorVariableType
 
 
-class AdditiveNoiseGenerator(NoiseGenerator):
+class AdditiveNoiseGenerator(TensorNoiseGenerator):
     def __init__(self,
                  scale: List[int] = (-1, 1),
                  dist: Literal["zeros", "ones", "normal", "uniform"] = "zeros",
@@ -57,7 +56,7 @@ class AdditiveNoiseGenerator(NoiseGenerator):
                   ) -> np.ndarray:
         return self.tensor_ops.numpy(noise_meta[0])
 
-    def construct_perturbation(self,
+    def construct_noise(self,
                     noise_meta: List[TensorVariableType]
                     ) -> TensorType:
         return self._mask * noise_meta[0]

@@ -1,65 +1,51 @@
-from abc import ABC, abstractmethod, ABCMeta
+from abc import ABC, abstractmethod
 
 import numpy as np
 
 from adversarial_lab.core.tensor_ops import TensorOps
-from adversarial_lab.core.optimizers import Optimizer
 
-from typing import Literal, Union, List, Tuple, Optional, Callable
-from adversarial_lab.core.types import TensorType, TensorVariableType, OptimizerType
+from typing import Literal, Any
 
 
 class NoiseGenerator(ABC):
-    def __init__(self,
-                 mask: Optional[np.ndarray] = None,
-                 requires_jacobian: bool = False) -> None:
-        self._mask = mask
-        self.requires_jacobian = requires_jacobian
+    def __init__(self) -> None:
+        pass
 
     @abstractmethod
     def generate_noise_meta(self,
-                            sample: TensorType | np.ndarray,
+                            sample: Any,
                             *args,
                             **kwargs
-                            ) -> List[TensorVariableType]:
+                            ) -> Any:
         pass
 
     @abstractmethod
     def get_noise(self,
-                  noise_meta: Union[TensorVariableType]
+                  noise_meta: Any
                   ) -> np.ndarray:
         pass
 
     @abstractmethod
-    def construct_perturbation(self,
-                               noise_meta: Union[TensorVariableType],
-                               *args,
-                               **kwargs
-                               ) -> Union[TensorVariableType, TensorType]:
+    def apply_noise(self,
+                    sample: Any,
+                    *args,
+                    **kwargs
+                    ) -> Any:
         pass
 
+    @abstractmethod
     def update(self,
-               noise_meta: TensorVariableType,
-               optimizer: OptimizerType | Optimizer,
-               grads: TensorType,
-               jacobian: TensorType = None,
-               predictions: TensorType = None,
-               target_vector: TensorType = None,
-               true_class: int = None,
-               predict_fn: Callable = None,
                *args,
                **kwargs
                ) -> None:
-        optimizer.update(weights=noise_meta, gradients=grads)
-
-    def get_mask(self) -> np.ndarray:
-        return self.tensor_ops.numpy(self._mask) if self._mask is not None else None
+        pass
 
     def set_framework(self,
                       framework: Literal["tf", "torch", "numpy"]
                       ) -> None:
         if framework not in ["tf", "torch", "numpy"]:
-            raise ValueError("framework must be either 'tf' or 'torch'")
+            raise ValueError(
+                "framework must be either 'tf', 'torch' or 'numpy'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
 

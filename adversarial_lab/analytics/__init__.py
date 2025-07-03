@@ -5,7 +5,11 @@ from .image_tracker import ImageTracker
 from .noise_tracker import NoiseTracker
 from .noise_statistics_tracker import NoiseStatisticsTracker
 from .predictions_tracker import PredictionsTracker
+from .custom_fields_tracker import CustomFieldsTracker
+from .llm_tracker import LLMTracker
 from .analytics import AdversarialAnalytics
+
+
 
 __all__ = [
     "AdversarialAnalytics",
@@ -14,5 +18,7 @@ __all__ = [
     "ImageTracker",
     "PredictionsTracker",
     "NoiseTracker",
-    "NoiseStatisticsTracker"
+    "NoiseStatisticsTracker",
+    "CustomFieldsTracker",
+    "LLMTracker"
 ]

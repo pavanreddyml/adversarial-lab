@@ -27,7 +27,7 @@ class DB(ABC):
         pass
 
     @abstractmethod
-    def create_table(self, table_name: str, schema: dict, force: bool = False) -> None:
+    def create_table(self, table_name: str, schema: dict, force: bool = False, primary_key_col_name: str = "id") -> None:
         """
         Create a table in the database.
 

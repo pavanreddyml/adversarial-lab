@@ -55,7 +55,7 @@ class PredictionsTracker(Tracker):
             
         self.epoch_predictions_by_batch[epoch_val] = [] 
 
-        for i, prediction in predictions:
+        for i, prediction in enumerate(predictions):
             batch_item_preds = {}
             for idx, value in enumerate(prediction):
                 if self.indexes[idx] == 1:

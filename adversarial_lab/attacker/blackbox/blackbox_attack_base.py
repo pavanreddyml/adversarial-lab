@@ -5,15 +5,12 @@ from tqdm import tqdm
 from copy import deepcopy
 
 from adversarial_lab.callbacks import *
-from adversarial_lab.core import ALModel
+from adversarial_lab.core.losses import Loss
 from adversarial_lab.attacker import AttackerBase
-from adversarial_lab.core.tensor_ops import TensorOps
-from adversarial_lab.analytics import AdversarialAnalytics
-from adversarial_lab.core.losses import Loss, LossRegistry
+from adversarial_lab.core.optimizers import Optimizer
+from adversarial_lab.core.noise_generators import NoiseGenerator
+from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
-from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
-from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
-from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
 
 from typing import Union, List, Optional, Literal, Callable
 
@@ -23,11 +20,27 @@ class BlackBoxAttack(AttackerBase):
     Base class for black-box adversarial attacks using flexible update and gradient strategies.
     """
 
+    @property
+    def _compatible_noise_generators(self) -> List[NoiseGenerator]:
+        """
+        Returns a list of compatible noise generator names for this attack.
+        Subclasses should override this property to specify compatible noise generators.
+        """
+        return ()
+
+    @property
+    def _compatible_trackers(self) -> List[Tracker]:
+        """
+        Returns a list of compatible optimizer names for this attack.
+        Subclasses should override this property to specify compatible optimizers.
+        """
+        return ()
+
     def __init__(self,
                  predict_fn: Callable,
                  optimizer: Union[str, Optimizer],
                  loss: Optional[Union[str, Loss]] = None,
-                 noise_generator: Optional[object] = None,
+                 noise_generator: Optional[NoiseGenerator] = None,
                  gradient_estimator: Optional[object] = None,
                  constraints: Optional[List[PostOptimizationConstraint]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,

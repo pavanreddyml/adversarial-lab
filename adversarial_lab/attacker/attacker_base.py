@@ -8,21 +8,41 @@ from copy import deepcopy
 from adversarial_lab.callbacks import *
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.tensor_ops import TensorOps
-from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.core.losses import Loss, LossRegistry
-from adversarial_lab.core.gradient_estimator import GradientEstimator
+from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
-from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
+from adversarial_lab.core.gradient_estimator import GradientEstimator, DummyGradientEstimator
+
+
+from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator, TextNoiseGenerator
+from adversarial_lab.core.noise_generators.tensor import AdditiveNoiseGenerator
 
 from typing import Union, List, Optional, Literal
 from adversarial_lab.core.types import TensorType
 
+NoiseGeneratorType = Union[TensorNoiseGenerator, TextNoiseGenerator]
 
 class AttackerBase(ABC):
     """
     Base class for white-box adversarial attack. Subclasses must implement specific attack methods.
     """
+
+    @property
+    def _compatible_noise_generators(self) -> List[NoiseGenerator]:
+        """
+        Returns a list of compatible noise generator names for this attack.
+        Subclasses should override this property to specify compatible noise generators.
+        """
+        return ()
+
+    @property
+    def _compatible_trackers(self) -> List[Tracker]:
+        """
+        Returns a list of compatible optimizer names for this attack.
+        Subclasses should override this property to specify compatible optimizers.
+        """
+        return ()
 
     def __init__(self,
                  model: ALModel,
@@ -96,6 +116,7 @@ class AttackerBase(ABC):
         self._initialize_constraints(constraints)
         self._initialize_callbacks(callbacks)
         self._initialize_analytics(analytics)
+        self._initialize_gradient_estimator(gradient_estimator)
 
         self.tensor_ops = TensorOps(framework=self.framework)
 
@@ -220,13 +241,24 @@ class AttackerBase(ABC):
         """
 
         if noise_generator is None:
-            self.noise_generator = AdditiveNoiseGenerator(
-                scale=(-0.05, 0.05), dist='uniform')
+            if TensorNoiseGenerator in self._compatible_noise_generators:
+                self.noise_generator: NoiseGeneratorType = AdditiveNoiseGenerator(
+                    scale=(-0.05, 0.05), dist='uniform')
+            elif TextNoiseGenerator in self._compatible_noise_generators:
+                raise NotImplementedError(
+                    "Default noise generator for text is not implemented. Please provide a valid noise generator.")
+            else:
+                raise ValueError(
+                    "No compatible noise generator found. Please provide a valid noise generator.")
         elif isinstance(noise_generator, NoiseGenerator):
-            self.noise_generator = noise_generator
+            if not isinstance(noise_generator, self._compatible_noise_generators):
+                raise ValueError(
+                    f"Invalid noise generator type: '{type(noise_generator)}'. Must be one of {self._compatible_noise_generators}.")
+            self.noise_generator: NoiseGeneratorType = noise_generator
         else:
             raise TypeError(
                 f"Invalid type for noise_generator: '{type(noise_generator)}'")
+        
         self.noise_generator.set_framework(self.framework)
         self.model.set_compute_jacobian(self.noise_generator.requires_jacobian)
 
@@ -328,6 +360,19 @@ class AttackerBase(ABC):
 
         self.callbacks = callbacks
 
+    def _initialize_gradient_estimator(self, gradient_estimator: Optional[GradientEstimator]):
+        if gradient_estimator is None:
+            self.gradient_estimator = DummyGradientEstimator()
+            return
+        elif not isinstance(gradient_estimator, GradientEstimator):
+            raise TypeError(
+                f"Invalid type for gradient_estimator: '{type(gradient_estimator)}'. Must be an instance of GradientEstimator.")
+        else:
+            self.gradient_estimator = gradient_estimator
+
+        self.gradient_estimator.set_framework(self.framework)
+
+    
     def _reset_callbacks(self):
         """
         Reset the state of all callbacks.

@@ -5,3 +5,4 @@ mypy
 Sphinx
 sphinx-autodoc-typehints
 plotly
+nltk

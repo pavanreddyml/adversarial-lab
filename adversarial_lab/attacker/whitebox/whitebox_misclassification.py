@@ -8,11 +8,13 @@ from adversarial_lab.core import ALModel
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
-from adversarial_lab.analytics import AdversarialAnalytics
+from adversarial_lab.exceptions import VectorDimensionsError
 from adversarial_lab.core.preprocessing import Preprocessing
 from adversarial_lab.core.noise_generators import NoiseGenerator
+from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
-from adversarial_lab.exceptions import VectorDimensionsError, IncompatibilityError
+
+from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator
 
 from typing import Optional, Union, Literal, List
 from adversarial_lab.core.types import TensorType, ModelType
@@ -25,6 +27,14 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
     It supports various strategies for generating the target vector and can handle binary and multi-class classification models.
     The attack uses a noise generator to create perturbations and an optimizer to update the noise during the attack process.
     """
+
+    @property
+    def _compatible_noise_generators(self) -> List[NoiseGenerator]:
+        return (TensorNoiseGenerator, )
+
+    @property
+    def _compatible_trackers(self) -> List[Tracker]:
+        return ()
 
     def __init__(self,
                  model: Union[ALModel, ModelType],
@@ -62,7 +72,6 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                binary_threshold: float = 0.5,
                epochs=10,
                on_original: bool = False,
-               addn_analytics_fields: Optional[dict] = None,
                *args,
                **kwargs
                ) -> np.ndarray:
@@ -76,7 +85,6 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             )
 
         super().attack(epochs, *args, **kwargs)
-        addn_analytics_fields = addn_analytics_fields or {}
 
         preprocessed_sample = self.tensor_ops.remove_batch_dim(
             self.preprocessing.preprocess(sample))
@@ -104,14 +112,13 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             noise=self.noise_generator.get_noise(noise_meta),
             predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=on_original,
-            **addn_analytics_fields
         )
 
         for epoch in range(epochs):
             grads, jacobian, logits, preds = self.model.calculate_gradients(
                 sample=sample_to_attack,
                 noise=noise_meta,
-                construct_perturbation_fn=self.noise_generator.construct_perturbation,
+                construct_noise_fn=self.noise_generator.construct_noise,
                 target_vector=target_vector,
                 loss=self.loss,
                 preprocess_fn=self.preprocessing.preprocess if on_original else None)
@@ -132,7 +139,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             # Stats
             predictions = self.model.predict(
                 x=sample_to_attack +
-                self.noise_generator.construct_perturbation(noise_meta),
+                self.noise_generator.construct_noise(noise_meta),
                 preprocess_fn=self.preprocessing.preprocess if on_original else None
             )
 
@@ -153,7 +160,6 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                 predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
                     predictions)),
                 on_original=on_original,
-                **addn_analytics_fields
             )
 
             callbacks_data = self._apply_callbacks(
@@ -174,7 +180,6 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             noise=self.noise_generator.get_noise(noise_meta),
             predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=on_original,
-            **addn_analytics_fields
         )
 
         return self.noise_generator.get_noise(noise_meta), noise_meta
@@ -194,17 +199,17 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
         if not self.tensor_ops.has_batch_dim(preprocessed_sample):
             warnings.warn("The sample after preprocessing does not have a batch dimension. "
                           "Adding a batch dimension must be handled in the preprocessing function."
-                          "If sample does not requrie a batch dimension, ignore this warning.")
+                          "If sample does not require a batch dimension, ignore this warning.")
 
         noise_meta = self.noise_generator.generate_noise_meta(
             sample_to_attack)
 
         predictions = self.model.predict(
             x=sample_to_attack +
-            self.noise_generator.construct_perturbation(noise_meta),
+            self.noise_generator.construct_noise(noise_meta),
             preprocess_fn=self.preprocessing.preprocess if on_original else None
         )  # Testing if noise can be applied to the preprocessed image
-        predictions = predictions = self.model.predict(
+        predictions = self.model.predict(
             x=sample_to_attack,
             preprocess_fn=self.preprocessing.preprocess if on_original else None
         )

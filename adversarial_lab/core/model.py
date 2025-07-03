@@ -291,7 +291,7 @@ class ALModelTF(ALModelBase):
     def calculate_gradients(self,
                             sample: TensorType,
                             noise: List[TensorVariableType],
-                            construct_perturbation_fn: Callable,
+                            construct_noise_fn: Callable,
                             target_vector: TensorType,
                             loss: Loss,
                             preprocess_fn: Optional[Callable] = None
@@ -303,7 +303,7 @@ class ALModelTF(ALModelBase):
             for n in noise:
                 tape.watch(n)
 
-            perturbation = construct_perturbation_fn(noise)
+            perturbation = construct_noise_fn(noise)
 
             if preprocess_fn is not None:
                 input = preprocess_fn(sample + perturbation)
