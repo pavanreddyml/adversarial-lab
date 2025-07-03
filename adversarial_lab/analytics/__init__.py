@@ -1,4 +1,3 @@
-
 from .tracker_base import Tracker
 from .loss_tracker import LossTracker
 from .image_tracker import ImageTracker

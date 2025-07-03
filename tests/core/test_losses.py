@@ -15,6 +15,10 @@ def test_loss_instantiation(framework):
     loss.set_framework(framework)
     assert loss.framework == framework
 
+def test_dummy_loss_returns_none():
+    loss = DummyLoss()
+    val = loss.calculate(None, None, None, None)
+    assert val is None
 
 def test_loss_invalid_framework():
     class DummyLoss(Loss):

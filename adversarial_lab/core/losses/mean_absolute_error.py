@@ -26,6 +26,6 @@ class MeanAbsoluteError(Loss):
                   ) -> LossType:
         loss = self.tensor_ops.losses.mean_absolute_error(target=target,
                                                           predictions=predictions)
-        self._apply_penalties(loss, noise)
+        loss = self._apply_penalties(loss, noise)
         self.set_value(loss)
         return loss

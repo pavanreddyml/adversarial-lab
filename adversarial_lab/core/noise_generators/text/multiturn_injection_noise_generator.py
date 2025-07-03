@@ -49,41 +49,23 @@ class PromptInjectionNoiseGenerator(TextNoiseGenerator):
     def generate_noise_meta(self,
                             sample: str,
                             ) -> List[str]:
-        return [
-            {
-                'text': ' ' * self.length,
-                'position': self.position,
-                'insertion': self.insertion,
-                'obfuscation': self.obfuscation,
-                'replacement': self.replacement,
-            }
-        ]
+        pass
 
     def get_noise(self,
                   noise_meta: List[str]
                   ) -> List[str]:
-        noise_meta.sort(key=lambda x: x['position'])
-        return noise_meta
+        pass
 
     def construct_noise(self,
                         noise_meta: List[str]
                         ) -> str:
-        noise = []
-        for meta in noise_meta:
-            noise.append({
-                'text': self._obfuscate_text(meta['text'], meta['obfuscation']),
-                'position': meta['position'],
-                'insertion': meta['insertion']
-            })
-
-        noise.sort(key=lambda x: x['position'])
-        return noise
+        pass
 
     def apply_noise(self,
                     prompt: str,
                     noise
                     ) -> str:
-        return self._insert_at_position(prompt, noise)
+        pass
 
     def update(self,
                *args,

@@ -31,4 +31,4 @@ class DummyLoss(Loss):
         """
         Does not perform any computation.
         """
-        pass
+        return None

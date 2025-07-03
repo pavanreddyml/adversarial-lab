@@ -26,6 +26,8 @@ class TextNoiseGenerator(NoiseGenerator):
             return text.encode('utf-8').hex()
         elif obfuscation == 'base64':
             return base64.b64encode(text.encode('utf-8')).decode('utf-8')
+        elif obfuscation == 'ascii':
+            return text.encode('ascii', 'ignore').decode('ascii')
         else:
             return text
         

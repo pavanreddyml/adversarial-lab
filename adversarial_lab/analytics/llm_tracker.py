@@ -1,14 +1,16 @@
-from typing import Dict, List, Literal
 from . import Tracker
 
 import warnings
 import numpy as np
 
+from typing import Dict, List, Literal, Any
 
 class LLMTracker(Tracker):
     _columns = {
         "epoch_llm_prompt": "str",
         "epoch_llm_prompt_by_batch": "json",
+        "epoch_llm_noise": "json",
+        "epoch_llm_noise_by_batch": "json",
         "epoch_llm_response": "str",
         "epoch_llm_response_by_batch": "json"
     }
@@ -24,6 +26,7 @@ class LLMTracker(Tracker):
                    **kwargs
                    ) -> None:
         prompts = kwargs.get("original_sample", [])
+        noise = kwargs.get("noise", [])
         predictions = kwargs.get("predictions", [])
 
         if not self.track_batch:
@@ -35,6 +38,7 @@ class LLMTracker(Tracker):
             epoch_val = max(self.epoch_llm_prompt_by_batch.keys()) + 1
             
         self.epoch_llm_prompt_by_batch[epoch_val] = prompts
+        self.epoch_llm_noise_by_batch[epoch_val] = noise
         self.epoch_llm_response_by_batch[epoch_val] = predictions
 
     def post_epoch(self,
@@ -42,12 +46,14 @@ class LLMTracker(Tracker):
                    **kwargs
                    ) -> None:
         prompt = kwargs.get("original_sample", "")
+        noise = kwargs.get("noise", {})
         prediction = kwargs.get("predictions", "")
 
         if not self.track_epoch:
             return  
         
         self.epoch_llm_prompt = prompt
+        self.epoch_llm_noise = noise
         self.epoch_llm_response = prediction
 
         
@@ -68,6 +74,8 @@ class LLMTracker(Tracker):
     def reset_values(self) -> None:
         self.epoch_llm_prompt = ""
         self.epoch_llm_prompt_by_batch: Dict[int, List[str]] = {}
+        self.epoch_llm_noise: Dict[str, Any] = {}
+        self.epoch_llm_noise_by_batch: Dict[int, List[Dict]] = {}
         self.epoch_llm_response = ""
         self.epoch_llm_response_by_batch: Dict[int, List[str]] = {}
 

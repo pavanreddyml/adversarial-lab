@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 class Tracker(ABC):
     @property
     def _columns(self) -> Dict:
-        return self._columns
+        return {}
 
     def __init__(self,
                  track_batch: bool = True,

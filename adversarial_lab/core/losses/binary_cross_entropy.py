@@ -25,6 +25,6 @@ class BinaryCrossEntropy(Loss):
                                                           predictions=predictions, 
                                                           logits=logits, 
                                                           from_logits=self.from_logits)
-        self._apply_penalties(loss, noise)
+        loss = self._apply_penalties(loss, noise)
         self.set_value(loss)
         return loss
