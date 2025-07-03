@@ -49,6 +49,7 @@ setup(
             "mypy==1.12.0",
             "Sphinx==8.2.3",
             "sphinx-autodoc-typehints==3.1.0",
+            "sphinx-rtd-theme==3.0.2",
         ]
     },
     classifiers=[
