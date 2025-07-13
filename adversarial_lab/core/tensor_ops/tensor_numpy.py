@@ -240,15 +240,31 @@ class NumpyOptimizers:
             return params
 
     class PGD(NumpyOptimizer):
-        def __init__(self, learning_rate: float = 0.01, projection_fn: Any = None):
+        def __init__(self, learning_rate: float = 0.01, projection_fn: Any = None, topk_percent: float = 1.0):
             self.learning_rate = learning_rate
             self.projection_fn = projection_fn
+            self.topk_percent = topk_percent
 
         def apply(self, params: List[np.ndarray], grads: List[np.ndarray]) -> List[np.ndarray]:
             for p, g in zip(params, grads):
-                p -= self.learning_rate * np.sign(g)
+                if self.topk_percent < 1.0:
+                    flat = g.flatten()
+                    k = int(self.topk_percent * flat.size)
+                    if k > 0:
+                        idx = np.argpartition(np.abs(flat), -k)[-k:]
+                        mask = np.zeros_like(flat)
+                        mask[idx] = 1
+                        masked_grad = (flat * mask).reshape(g.shape)
+                    else:
+                        masked_grad = np.zeros_like(g)
+                else:
+                    masked_grad = g
+
+                p -= self.learning_rate * np.sign(masked_grad)
+
                 if self.projection_fn is not None:
                     p[:] = self.projection_fn(p)
+
             return params
         
     @staticmethod

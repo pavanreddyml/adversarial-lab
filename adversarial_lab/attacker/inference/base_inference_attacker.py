@@ -12,18 +12,20 @@ from adversarial_lab.core.losses import Loss, LossRegistry
 from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
+from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
 from adversarial_lab.core.gradient_estimator import GradientEstimator, DummyGradientEstimator
 
 
 from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator, TextNoiseGenerator
 from adversarial_lab.core.noise_generators.tensor import AdditiveNoiseGenerator
 
-from typing import Union, List, Optional, Literal
 from adversarial_lab.core.types import TensorType
+from typing import Union, List, Optional, Literal, Callable
+
 
 NoiseGeneratorType = Union[TensorNoiseGenerator, TextNoiseGenerator]
 
-class AttackerBase(ABC):
+class InferenceAttackerBase(ABC):
     """
     Base class for white-box adversarial attack. Subclasses must implement specific attack methods.
     """
@@ -48,6 +50,7 @@ class AttackerBase(ABC):
                  model: ALModel,
                  optimizer: Union[str, Optimizer],
                  loss: Optional[Union[str, Loss]] = None,
+                 preprocessing: Optional[Preprocessing] = None,
                  noise_generator: Optional[NoiseGenerator] = None,
                  constraints: Optional[List[PostOptimizationConstraint]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,
@@ -110,6 +113,7 @@ class AttackerBase(ABC):
         self.framework: str = self.model.framework
 
         self._optimizer_arg = optimizer
+        self._initialize_preprocessing(preprocessing)
         self._initialize_optimizer(self._optimizer_arg)
         self._initialize_loss(loss)
         self._initialize_noise_generator(noise_generator)
@@ -144,6 +148,7 @@ class AttackerBase(ABC):
         Returns:
             np.ndarray: The adversarial noise generated during the attack.
         """
+        self.model.reset_query_count()
         self._initialize_optimizer(self._optimizer_arg)
         self._reset_callbacks()
 
@@ -156,6 +161,29 @@ class AttackerBase(ABC):
 
         self.progress_bar = tqdm(
             total=epochs, desc="Attacking", leave=True, disable=(self.verbose == 0))
+        
+    def _initialize_preprocessing(self, preprocessing):
+        """
+        Initializes the preprocessing pipeline for the attack. If no preprocessing is provided,
+        `NoPreprocessing` is used by default.
+
+        Parameters:
+        ----------
+        preprocessing : Preprocessing, optional
+            The preprocessing pipeline to apply before generating adversarial noise.
+
+        Raises:
+        -------
+        TypeError
+            If the preprocessing argument is not an instance of `Preprocessing`.
+        """
+        if preprocessing is None:
+            self.preprocessing = NoPreprocessing()
+        elif isinstance(preprocessing, Preprocessing):
+            self.preprocessing = preprocessing
+        else:
+            raise TypeError(
+                f"Invalid type for preprocessing: '{type(preprocessing)}'")
 
     def _initialize_optimizer(self, optimizer):
         """

@@ -5,15 +5,15 @@ from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.types import TensorType, TensorVariableType
 
 class GradientEstimator(ABC):
-    def __init__(self) -> None:
-        self.optimizer = None
+    def __init__(self, scale) -> None:
+        self.scale = scale
 
     @abstractmethod
     def calculate(self):
         pass
         
     def set_framework(self, 
-                      framework: Literal["tf", "torch", "numpy"]
+                      framework: Literal["numpy"]
                       ) -> None:
         if framework not in ["numpy"]:
             raise ValueError("gradient estimator supports only 'numpy' framework")

@@ -1,10 +1,8 @@
-from . import BlackBoxAttack
-
 import random
 import warnings
 import numpy as np
 
-from . import BlackBoxAttack
+from .base_inference_attacker import InferenceAttackerBase
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
@@ -18,7 +16,7 @@ from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGen
 from typing import Optional, List, Callable, Literal, Union
 
 
-class BlackBoxMisclassificationAttack(BlackBoxAttack):
+class BlackBoxMisclassificationAttack(InferenceAttackerBase):
     """
     BlackBoxMisclassificationAttack generates adversarial examples that force misclassification.
     """
@@ -32,7 +30,7 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
         return ()
 
     def __init__(self,
-                 predict_fn: Callable,
+                 model: Callable,
                  optimizer: Union[str, Optimizer],
                  loss: Optional[Union[str, Loss]] = None,
                  noise_generator: Optional[NoiseGenerator] = None,
@@ -44,7 +42,7 @@ class BlackBoxMisclassificationAttack(BlackBoxAttack):
                  max_queries: int = 10000,
                  *args,
                  **kwargs) -> None:
-        super().__init__(predict_fn=predict_fn,
+        super().__init__(model=model,
                          optimizer=optimizer,
                          loss=loss,
                          noise_generator=noise_generator,

@@ -3,7 +3,7 @@ import numpy as np
 
 import warnings
 
-from . import WhiteBoxAttack
+from .base_inference_attacker import InferenceAttackerBase
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
@@ -20,7 +20,7 @@ from typing import Optional, Union, Literal, List
 from adversarial_lab.core.types import TensorType, ModelType
 
 
-class WhiteBoxMisclassification(WhiteBoxAttack):
+class WhiteBoxMisclassificationAttack(InferenceAttackerBase):
     """
     WhiteBoxMisclassification is a white-box attack that generates adversarial examples by applying perturbations to the input sample.
     The attack aims to misclassify the input sample into a target class or target vector.

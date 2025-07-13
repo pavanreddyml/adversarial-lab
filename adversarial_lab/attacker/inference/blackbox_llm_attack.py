@@ -1,6 +1,6 @@
 from typing import Callable, Optional, List, Union
 
-from .blackbox_attack_base import BlackBoxAttack
+from .base_inference_attacker import InferenceAttackerBase
 from adversarial_lab.core.noise_generators import NoiseGenerator, TextNoiseGenerator
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.optimizers import Optimizer
@@ -10,7 +10,7 @@ from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.callbacks import Callback
 
 
-class BlackBoxLLMAttack(BlackBoxAttack):
+class BlackBoxLLMAttack(InferenceAttackerBase):
     """Attack that tries to inject adversarial text into LLM prompts."""
 
     @property
@@ -20,9 +20,13 @@ class BlackBoxLLMAttack(BlackBoxAttack):
     @property
     def _compatible_trackers(self) -> List[Tracker]:
         return ()
+    
+    @property
+    def _compatible_gradient_estimators(self) -> List[GradientEstimator]:
+        return ()
 
     def __init__(self,
-                 predict_fn: Callable[[str], str],
+                 model: Callable[[str], str],
                  optimizer: Union[str, Optimizer],
                  loss: Optional[Union[str, Loss]] = None,
                  noise_generator: Optional[NoiseGenerator] = None,
@@ -34,7 +38,7 @@ class BlackBoxLLMAttack(BlackBoxAttack):
                  max_queries: int = 1000,
                  *args,
                  **kwargs) -> None:
-        super().__init__(predict_fn=predict_fn,
+        super().__init__(model=model,
                          optimizer=optimizer,
                          loss=loss,
                          noise_generator=noise_generator,

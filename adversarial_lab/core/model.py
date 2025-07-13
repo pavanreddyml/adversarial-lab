@@ -431,7 +431,7 @@ class ALModelNumpy(ALModelBase):
 
         logits = None
         logit_grads = None 
-        preds = self.model(sample + construct_perturbation_fn(noise))
+        preds = self.model([sample + construct_perturbation_fn(noise)])
 
         return grad_wrt_loss, logit_grads, logits, preds
 

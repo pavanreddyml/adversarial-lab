@@ -260,11 +260,13 @@ class TorchOptimizers:
 
     @staticmethod
     def PGD(learning_rate: float = 0.01,
-            projection_fn: Callable[[TensorType], TensorType] = None
+            projection_fn: Callable[[TensorType], TensorType] = None,
+            topk_percent: float = 1.0
             ) -> OptimizerType:
+
         class PGDOptimizer(torch.optim.Optimizer):
-            def __init__(self, params, lr=0.01, projection_fn=None):
-                defaults = dict(lr=lr, projection_fn=projection_fn)
+            def __init__(self, params, lr=0.01, projection_fn=None, topk_percent=1.0):
+                defaults = dict(lr=lr, projection_fn=projection_fn, topk_percent=topk_percent)
                 super().__init__(params, defaults)
 
             @torch.no_grad()
@@ -272,18 +274,38 @@ class TorchOptimizers:
                 for group in self.param_groups:
                     lr = group['lr']
                     projection_fn = group['projection_fn']
+                    topk_percent = group['topk_percent']
+
                     for param in group['params']:
                         if param.grad is None:
                             continue
-                        param.data -= lr * param.grad
+
+                        grad = param.grad
+
+                        if topk_percent < 1.0:
+                            k = int(topk_percent * grad.numel())
+                            if k > 0:
+                                flat_grad = grad.view(-1)
+                                _, topk_indices = torch.topk(flat_grad.abs(), k, sorted=False)
+                                mask = torch.zeros_like(flat_grad)
+                                mask[topk_indices] = 1.0
+                                masked_grad = (flat_grad * mask).view_as(grad)
+                            else:
+                                masked_grad = torch.zeros_like(grad)
+                        else:
+                            masked_grad = grad
+
+                        param.data -= lr * masked_grad
+
                         if projection_fn:
                             param.data = projection_fn(param.data)
+
                 if closure is not None:
                     return closure()
 
         temp_param = torch.nn.Parameter(torch.tensor(0.0, requires_grad=True))
-        opt = PGDOptimizer([temp_param], lr=learning_rate, projection_fn=projection_fn)
-        opt.param_groups[0]["params"] = [] 
+        opt = PGDOptimizer([temp_param], lr=learning_rate, projection_fn=projection_fn, topk_percent=topk_percent)
+        opt.param_groups[0]["params"] = []
         return opt
 
     @staticmethod

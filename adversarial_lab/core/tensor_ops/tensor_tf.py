@@ -261,29 +261,47 @@ class TFOptimizers:
         )
     
     @staticmethod
-    def PGD(learning_rate: float = 0.01,
-        projection_fn: Callable[[TensorType], TensorType] = None
-        ) -> OptimizerType:
+    def PGD(
+        learning_rate: float = 0.01,
+        projection_fn: Callable[[TensorType], TensorType] = None,
+        topk_percent: float = 1.0  # 1.0 = full gradient
+    ) -> OptimizerType:
 
         class PGDOptimizer(tf.keras.optimizers.Optimizer):
-            def __init__(self, learning_rate=0.01, projection_fn=None, name="PGD", **kwargs):
+            def __init__(self, learning_rate=0.01, projection_fn=None, topk_percent=1.0, name="PGD", **kwargs):
                 super().__init__(name=name, learning_rate=learning_rate, **kwargs)
                 self.projection_fn = projection_fn
+                self.topk_percent = topk_percent
 
             def update_step(self, gradient, variable, learning_rate):
-                variable.assign_sub(learning_rate * tf.sign(gradient))
+                if self.topk_percent < 1.0:
+                    k = tf.cast(tf.size(gradient) * self.topk_percent, tf.int32)
+                    flat_grad = tf.reshape(gradient, [-1])
+                    _, topk_indices = tf.math.top_k(tf.abs(flat_grad), k=k, sorted=False)
+                    mask = tf.scatter_nd(
+                        indices=tf.expand_dims(topk_indices, 1),
+                        updates=tf.ones_like(topk_indices, dtype=gradient.dtype),
+                        shape=tf.shape(flat_grad)
+                    )
+                    masked_grad = tf.reshape(flat_grad * mask, tf.shape(gradient))
+                else:
+                    masked_grad = gradient
+
+                variable.assign_sub(learning_rate * tf.sign(masked_grad))
+
                 if self.projection_fn:
                     variable.assign(self.projection_fn(variable))
 
             def get_config(self):
                 config = super().get_config()
                 config.update({
-                    "learning_rate": float(tf.keras.backend.get_value(self._serialize_hyperparameter('learning_rate'))),
-                    "projection_fn": self.projection_fn
+                    "learning_rate": float(tf.keras.backend.get_value(self._serialize_hyperparameter("learning_rate"))),
+                    "projection_fn": self.projection_fn,
+                    "topk_percent": self.topk_percent,
                 })
                 return config
 
-        return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)
+        return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn, topk_percent=topk_percent)
     
     @staticmethod
     def apply(optimizer: tf.keras.optimizers.Optimizer,
