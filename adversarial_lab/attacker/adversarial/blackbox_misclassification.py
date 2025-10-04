@@ -2,7 +2,7 @@ import random
 import warnings
 import numpy as np
 
-from .base_inference_attacker import InferenceAttackerBase
+from .base_adversarial_attacker import AdversarialAttackerBase
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
@@ -16,7 +16,7 @@ from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGen
 from typing import Optional, List, Callable, Literal, Union
 
 
-class BlackBoxMisclassificationAttack(InferenceAttackerBase):
+class BlackBoxMisclassificationAttack(AdversarialAttackerBase):
     """
     BlackBoxMisclassificationAttack generates adversarial examples that force misclassification.
     """
@@ -257,3 +257,4 @@ class BlackBoxMisclassificationAttack(InferenceAttackerBase):
                 "target_vector must be the same size as the outputs.")
 
         return target_vector
+

@@ -1,6 +1,6 @@
 from typing import Callable, Optional, List, Union
 
-from .base_inference_attacker import InferenceAttackerBase
+from .base_adversarial_attacker import AdversarialAttackerBase
 from adversarial_lab.core.noise_generators import NoiseGenerator, TextNoiseGenerator
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.optimizers import Optimizer
@@ -10,7 +10,7 @@ from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.callbacks import Callback
 
 
-class BlackBoxLLMAttack(InferenceAttackerBase):
+class BlackBoxLLMAttack(AdversarialAttackerBase):
     """Attack that tries to inject adversarial text into LLM prompts."""
 
     @property

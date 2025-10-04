@@ -12,32 +12,11 @@ class NoiseGenerator(ABC):
         pass
 
     @abstractmethod
-    def generate_noise_meta(self,
-                            sample: Any,
-                            *args,
-                            **kwargs
-                            ) -> Any:
-        pass
-
-    @abstractmethod
-    def get_noise(self,
-                  noise_meta: Any
-                  ) -> np.ndarray:
-        pass
-
-    @abstractmethod
     def apply_noise(self,
                     sample: Any,
                     *args,
                     **kwargs
                     ) -> Any:
-        pass
-
-    @abstractmethod
-    def update(self,
-               *args,
-               **kwargs
-               ) -> None:
         pass
 
     def set_framework(self,

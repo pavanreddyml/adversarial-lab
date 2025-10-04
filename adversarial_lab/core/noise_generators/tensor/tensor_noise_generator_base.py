@@ -6,7 +6,7 @@ import numpy as np
 from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.core.noise_generators import NoiseGenerator
 
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Any
 from adversarial_lab.core.types import TensorType, TensorVariableType, OptimizerType
 
 
@@ -16,6 +16,27 @@ class TensorNoiseGenerator(NoiseGenerator):
                  requires_jacobian: bool = False) -> None:
         self._mask = mask
         self.requires_jacobian = requires_jacobian
+
+    @abstractmethod
+    def generate_noise_meta(self,
+                            sample: Any,
+                            *args,
+                            **kwargs
+                            ) -> Any:
+        pass
+
+    @abstractmethod
+    def get_noise(self,
+                  noise_meta: Any
+                  ) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def update(self,
+               *args,
+               **kwargs
+               ) -> None:
+        pass
 
     @abstractmethod
     def construct_noise(self,

@@ -4,11 +4,11 @@ class OptimizerRegistry:
     __optmizers = {
         "adam": Adam,
         "sgd": SGD,
-        "pgd": PGD
+        "pgd": PGD,
     }
 
     @classmethod
-    def get(cls, optmizer: str) -> Optimizer:
+    def get(cls, optimizer: str) -> Optimizer:
         """
         Retrieve an optimizer class by name.
 
@@ -30,6 +30,8 @@ class OptimizerRegistry:
             - The method ensures that only registered optimizers can be retrieved.
             - If an invalid optimizer name is provided, a `ValueError` is raised.
         """
-        if optmizer not in cls.__optmizers:
-            raise ValueError(f"Invalid value for optmizer: '{optmizer}'. Optimizer of this type does not exist.")
-        return cls.__optmizers[optmizer]
+        if isinstance(optimizer, Optimizer):
+            return optimizer
+        if optimizer not in cls.__optmizers:
+            raise ValueError(f"Invalid value for optmizer: '{optimizer}'. Optimizer of this type does not exist.")
+        return cls.__optmizers[optimizer]

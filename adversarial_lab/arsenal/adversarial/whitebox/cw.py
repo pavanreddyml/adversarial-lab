@@ -1,6 +1,6 @@
-from ..attacks_base import AttacksBase
+from ...attacks_base import AttacksBase
 
-from adversarial_lab.attacker.whitebox import WhiteBoxMisclassification
+from adversarial_lab.attacker.adversarial import WhiteBoxMisclassificationAttack
 from adversarial_lab.core.noise_generators.tensor import AdditiveNoiseGenerator
 from adversarial_lab.core.losses import CategoricalCrossEntropy
 from adversarial_lab.core.optimizers import Adam
@@ -55,7 +55,7 @@ class CarliniWagnerAttack(AttacksBase):
                  verbose=2,
                  *args,
                  **kwargs):
-        self.attacker = WhiteBoxMisclassification(
+        self.attacker = WhiteBoxMisclassificationAttack(
             model=model,
             loss=CWLoss(C=C, kappa=kappa, penalties=[LpNorm(p=2, lambda_val=1)]),
             optimizer=Adam(learning_rate=learning_rate),

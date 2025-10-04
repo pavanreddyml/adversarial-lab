@@ -1,45 +1,44 @@
-from adversarial_lab.core.gradient_estimator import FDGradientEstimator
 import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
 
-class DummyLoss:
-    def calculate(self, target, predictions, logits=None, noise=None):
-        # Simple squared error for testing
-        return np.sum((predictions - target)**2)
+from adversarial_lab.core.noise_generators.dataset import TrojanImageNoiseGenerator
 
-# Instantiate estimator
-fdge = FDGradientEstimator(
-    epsilon=1e-5,
-    max_perturbations=10000,
-    batch_size=32,
-    block_size=4,
-    block_pattern="square"
+# Input image path (28x28 grayscale)
+in_path = r'C:\Users\Pavan Reddy\Desktop\adversarial-lab\examples\data\digits\1\1.png'
+
+# Load sample as numpy (grayscale)
+sample = np.array(Image.open(in_path).convert("L"), dtype=np.uint8)  # (28, 28)
+
+# 3x3 white patch trojan
+trojan_patch = np.full((3, 3), 255, dtype=np.uint8)
+
+# Create generator
+gen = TrojanImageNoiseGenerator(
+    trojans=[trojan_patch],
+    size=(3, 3),
+    position=(15.0, 10.0),
+    rotation=(0.5, 0.7),
+    keep_aspect_ratio=False,
+    fit_to_size=True,
+    coerce_out_of_bound=True,
+    alpha=0.2
 )
 
-# Setup dummy inputs
-np.random.seed(42)
-sample = np.random.rand(10, 10)
-noise = [np.zeros_like(sample)]
+# Apply trojan
+trojaned = gen.apply_noise(sample, trojan_id=0)
 
-def predict_fn(samples):
-    # Return identity predictions, wrapped in a list
-    return [s for s in samples]
+# Plot with matplotlib (no saving)
+plt.figure(figsize=(6, 3))
+plt.subplot(1, 2, 1)
+plt.title("Original")
+plt.imshow(sample, cmap="gray", vmin=0, vmax=255)
+plt.axis("off")
 
-def construct_target_vector(sample):
-    # Return flattened average target
-    return np.mean(sample) * np.ones_like(sample)
+plt.subplot(1, 2, 2)
+plt.title("With 3x3 Trojan")
+plt.imshow(trojaned, cmap="gray", vmin=0, vmax=255)
+plt.axis("off")
 
-# Dummy loss instance
-loss = DummyLoss()
-
-# Call calculate
-grads = fdge.calculate(
-    sample=sample,
-    noise=noise,
-    target_vector=construct_target_vector(sample),
-    predict_fn=predict_fn,
-    construct_perturbation_fn=lambda x: x[0],
-    loss=loss,
-    mask=np.ones_like(sample)
-)
-
-print(grads[0])
+plt.tight_layout()
+plt.show()

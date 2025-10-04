@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from . import Tracker
 
 import warnings
@@ -9,8 +9,8 @@ class CustomFieldsTracker(Tracker):
     _allowed_types = ["int", "str", "float", "bool", "json", "blob"]
 
     def __init__(self,
-                 field_types: Dict[str, str] = None,
-                 field_values: Dict[str, Any] = None,
+                 field_types: Optional[Dict[str, str]] = None,
+                 field_values: Optional[Dict[str, Any]] = None,
                  ) -> None:
         super().__init__()
         self.warned = False
@@ -70,3 +70,5 @@ class CustomFieldsTracker(Tracker):
             elif expected_type == "blob" and not isinstance(value, bytes):
                 warnings.warn(f"Expected blob for field '{key}', but got {type(value).__name__}. Setting NULL.")
                 self.data[key] = None
+
+        self.field_values = self.data.copy()
