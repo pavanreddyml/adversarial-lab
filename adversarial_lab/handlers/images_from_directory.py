@@ -15,7 +15,7 @@ class ImagesFromDirectory(HandlerBase):
     def __init__(
         self,
         directory_path,
-        write_path=None,
+        output_path=None,
         batch_size=1,
         strategy='sequential',
         overwrite=False,
@@ -26,18 +26,18 @@ class ImagesFromDirectory(HandlerBase):
         super().__init__(batch_size=batch_size, *args, **kwargs)
         self.directory_path = directory_path
 
-        if write_path is None:
-            self.write_path = directory_path
+        if output_path is None:
+            self.output_path = directory_path
             self.same_read_write = True
             warnings.warn(
                 "Write path not provided. Using directory_path as write_path. "
                 "To overwrite in same directory, set `overwrite=True`. Not doing so will raise an error."
             )
         else:
-            if not os.path.isdir(write_path):
-                raise ValueError(f"Write path {write_path} is not a valid directory.")
-            self.write_path = write_path
-            self.same_read_write = os.path.abspath(directory_path) == os.path.abspath(write_path)
+            if not os.path.isdir(output_path):
+                raise ValueError(f"Output path {output_path} is not a valid directory.")
+            self.output_path = output_path
+            self.same_read_write = os.path.abspath(directory_path) == os.path.abspath(output_path)
 
         if strategy not in ('sequential', 'random'):
             raise ValueError(f"Unsupported strategy '{strategy}'. Use 'sequential' or 'random'.")
@@ -49,10 +49,11 @@ class ImagesFromDirectory(HandlerBase):
         self.image_files: Dict[str, List[str]] = {"__root": []}
         self.initialize()
 
-    def _choose_path(self, class_name: str, file_name: str) -> str:
+    def _choose_path(self, class_name: str, file_name: str, write=False) -> str:
+        base_path = self.output_path if write else self.directory_path
         if class_name == "__root":
-            return os.path.join(self.directory_path, file_name)
-        return os.path.join(self.directory_path, class_name, file_name)
+            return os.path.join(base_path, file_name)
+        return os.path.join(base_path, class_name, file_name)
 
     def load(self, class_name: str = None):
         if class_name is not None and class_name not in self.image_files and class_name != "__root":
@@ -101,13 +102,24 @@ class ImagesFromDirectory(HandlerBase):
         return img_array, file_name, class_name
 
     def write(self, arr: np.ndarray, file_name: str, class_name,  *args, **kwargs) -> None:
-        path = self._choose_path(class_name, file_name)
+        path = self._choose_path(class_name, file_name, write=True)
 
         if os.path.exists(path) and not self.overwrite:
             raise FileExistsError(f"File {path} already exists and overwrite is set to False.")
 
         img = Image.fromarray(arr)
         img.save(path)
+
+    def get_class_names(self):
+        return set(self.image_files.keys())
+    
+    def get_num_entries_by_class(self, class_name: str):
+        if class_name not in self.image_files:
+            raise ValueError(f"Class name {class_name} is invalid.")
+        return len(self.image_files[class_name])
+    
+    def get_total_samples(self):
+        return sum(len(files) for files in self.image_files.values())
 
     def initialize(self):
         self.image_files = {"__root": []}
@@ -125,7 +137,7 @@ class ImagesFromDirectory(HandlerBase):
                 if any(os.path.isdir(p) for p in subdirs):
                     raise ValueError("Nested directories are not supported.")
 
-                os.makedirs(os.path.join(self.write_path, entry), exist_ok=True)
+                os.makedirs(os.path.join(self.output_path, entry), exist_ok=True)
 
                 files = [f for f in os.listdir(entry_path) if f.lower().endswith(self.ALLOWED_EXTS)]
                 files.sort()

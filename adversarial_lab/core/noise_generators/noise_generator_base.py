@@ -18,6 +18,10 @@ class NoiseGenerator(ABC):
                     **kwargs
                     ) -> Any:
         pass
+    
+    @abstractmethod
+    def get_num_trojans(self) -> int:
+        pass
 
     def set_framework(self,
                       framework: Literal["tf", "torch", "numpy"]

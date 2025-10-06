@@ -1,44 +1,49 @@
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import os
 
 from adversarial_lab.core.noise_generators.dataset import TrojanImageNoiseGenerator
+from adversarial_lab.handlers.images_from_directory import ImagesFromDirectory
+from adversarial_lab.attacker.data.trojan_attaker import TrojanAttacker
 
-# Input image path (28x28 grayscale)
-in_path = r'C:\Users\Pavan Reddy\Desktop\adversarial-lab\examples\data\digits\1\1.png'
+# Setup handler for a directory of images (change path as needed)
+handler = ImagesFromDirectory(
+    directory_path=r'C:\Users\Pavan Reddy\Desktop\Train',
+    output_path=r'C:\Users\Pavan Reddy\Desktop\ttroj',
+    include_alpha=False,
+    batch_size=16,
+    overwrite= True
+)
 
-# Load sample as numpy (grayscale)
-sample = np.array(Image.open(in_path).convert("L"), dtype=np.uint8)  # (28, 28)
+trojan_patch_white = np.full((3, 3), 255, dtype=np.uint8)
+trojan_patch_black = np.full((3, 3), 156, dtype=np.uint8)
 
-# 3x3 white patch trojan
-trojan_patch = np.full((3, 3), 255, dtype=np.uint8)
-
-# Create generator
+# Create noise generator with two trojans
 gen = TrojanImageNoiseGenerator(
-    trojans=[trojan_patch],
-    size=(3, 3),
+    trojans=[trojan_patch_white, trojan_patch_black],
+    size=(8, 8),
     position=(15.0, 10.0),
     rotation=(0.5, 0.7),
     keep_aspect_ratio=False,
     fit_to_size=True,
     coerce_out_of_bound=True,
-    alpha=0.2
 )
 
-# Apply trojan
-trojaned = gen.apply_noise(sample, trojan_id=0)
+# Poison 30% with trojan 0 (white), 20% with trojan 1 (black) for class '1'
+class_trojan_map = {
+    'digit_0': {0: 0.3, 1: 0.2},
+    "digit_1": {0: 0.3, 1: 0.2}
+}
 
-# Plot with matplotlib (no saving)
-plt.figure(figsize=(6, 3))
-plt.subplot(1, 2, 1)
-plt.title("Original")
-plt.imshow(sample, cmap="gray", vmin=0, vmax=255)
-plt.axis("off")
+for i in os.listdir(r'C:\Users\Pavan Reddy\Desktop\Train'):
+    if i not in class_trojan_map:
+        class_trojan_map[i] = {}
 
-plt.subplot(1, 2, 2)
-plt.title("With 3x3 Trojan")
-plt.imshow(trojaned, cmap="gray", vmin=0, vmax=255)
-plt.axis("off")
-
-plt.tight_layout()
-plt.show()
+attacker = TrojanAttacker(
+    handler=handler,
+    noise_generator=gen,
+    verbose=2,
+    copy_remaining=True,
+)
+attacker.attack(class_trojan_map=class_trojan_map)

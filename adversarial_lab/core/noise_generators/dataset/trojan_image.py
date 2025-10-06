@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
 import random
-from typing import Any, List, Tuple, Optional
+from typing import Any, List, Tuple
 
 from adversarial_lab.core.noise_generators import NoiseGenerator
 
@@ -11,21 +11,22 @@ class TrojanImageNoiseGenerator(NoiseGenerator):
         self,
         trojans: List[str | np.ndarray],
         size: Tuple[int, int] | int = (32, 32),
-        position: Tuple[float, float] = (10.0, 10.0),  # (x%, y%) with 0,0 bottom-left and 100,100 top-right
+        position: Tuple[float, float] = (10.0, 10.0),
         rotation: Tuple[float, float] | float = (0.0, 0.0),
         keep_aspect_ratio: bool = True,
         fit_to_size: bool = True,
         coerce_out_of_bound: bool = True,
-        alpha: float = 1.0,  # NEW: global alpha in [0,1]
+        alpha: float = 1.0,
     ):
-        if all(isinstance(trojan, np.ndarray) for trojan in trojans):
+        if len(trojans) == 0:
+            raise ValueError("At least one trojan must be provided.")
+
+        if all(isinstance(t, np.ndarray) for t in trojans):
             self.trojans = trojans
-        elif all(isinstance(trojan, str) for trojan in trojans):
-            if not all(
-                trojan.lower().endswith((".png", ".jpg", ".jpeg")) for trojan in trojans
-            ):
+        elif all(isinstance(t, str) for t in trojans):
+            if not all(t.lower().endswith((".png", ".jpg", ".jpeg")) for t in trojans):
                 raise ValueError("Trojans supported formats are .png, .jpg and .jpeg")
-            self.trojans = [np.array(Image.open(t).convert("RGBA")) for t in trojans]
+            self.trojans = [np.array(Image.open(t)) for t in trojans]
         else:
             raise ValueError("Trojans must be either all file paths or all numpy arrays.")
 
@@ -44,56 +45,50 @@ class TrojanImageNoiseGenerator(NoiseGenerator):
             raise ValueError("Position must be a tuple of two floats between 0.0 and 100.0 (percent).")
         self.position = position
 
-        if isinstance(rotation, float):
-            if not (0.0 <= rotation <= 1.0):
-                raise ValueError("Rotation must be a float between 0.0 and 1.0.")
-            self.rotation = (-rotation, rotation)
+        if isinstance(rotation, (int, float)):
+            if not (-360.0 <= float(rotation) <= 360.0):
+                raise ValueError("Rotation angle must be between -360 and 360 degrees.")
+            self.rotation = (float(rotation), float(rotation))
         elif isinstance(rotation, tuple) and len(rotation) == 2:
-            if not all(0.0 <= r <= 1.0 for r in rotation):
-                raise ValueError("Rotation values must be between 0.0 and 1.0.")
-            self.rotation = rotation
+            r0, r1 = float(rotation[0]), float(rotation[1])
+            if not (-360.0 <= r0 <= 360.0 and -360.0 <= r1 <= 360.0):
+                raise ValueError("Rotation angles must be between -360 and 360 degrees.")
+            self.rotation = (r0, r1)
         else:
-            raise ValueError("Rotation must be either a float or a tuple of two floats.")
+            raise ValueError("Rotation must be either a float angle or a tuple (min_deg, max_deg).")
 
         if not (0.0 <= alpha <= 1.0):
-            raise ValueError("alpha must be in [0, 1].")
-        self.global_alpha = alpha  # NEW
+            raise ValueError("alpha must be between 0.0 and 1.0.")
+        self.alpha = float(alpha)
+        self._current_alpha = None
 
         self.keep_aspect_ratio = keep_aspect_ratio
         self.fit_to_size = fit_to_size
         self.coerce_out_of_bound = coerce_out_of_bound
 
-        # Pillow resampling handles (compat with older/newer Pillow)
         self._RESIZE = getattr(Image, "LANCZOS", Image.BICUBIC)
         self._ROTATE = Image.BICUBIC
 
-    def apply_noise(
-        self, sample: np.ndarray, trojan_id: int, *args, alpha: Optional[float] = None, **kwargs
-    ) -> Any:
-        """
-        Returns the sample with the trojan composited at the requested position.
-        Position is (x%, y%) with 0,0 at bottom-left and 100,100 at top-right.
-        Optional `alpha` overrides the global alpha for this call.
-        """
-        if alpha is None:
-            alpha = self.global_alpha
-        else:
-            if not (0.0 <= alpha <= 1.0):
-                raise ValueError("alpha must be in [0, 1].")
+        self._last_mask_np = None
 
+    def apply_noise(self, sample: np.ndarray, trojan_id: int, *args, **kwargs) -> Any:
+        self._current_alpha = float(kwargs.get("alpha", self.alpha))
         raw_trojan = self.trojans[trojan_id]
         trojan = self._get_trojan_reshaped(sample, raw_trojan)[0]
-        out = self._composite_with_position_percent(
-            sample, trojan, self.position, self.coerce_out_of_bound, alpha_override=alpha
-        )
+        out = self._composite_hard_overwrite(sample, trojan, self.position, self.coerce_out_of_bound)
+        self._current_alpha = None
+        self._last_mask_np = None
         return out
+
+    def get_num_trojans(self) -> int:
+        return len(self.trojans)
 
     def _get_trojan_reshaped(self, sample: np.ndarray, trojan: np.ndarray) -> List[np.ndarray]:
         sample_h, sample_w, sample_c = self._shape_info(sample)
         target_w, target_h = self.size
 
         trojan_img = self._np_to_pil(trojan)
-        trojan_img = self._convert_mode_to_match_sample(trojan_img, sample_c)
+        trojan_img = self._convert_mode_to_match_sample(trojan_img, 1 if sample_c == 1 else 3)
 
         tw, th = trojan_img.size
 
@@ -110,13 +105,122 @@ class TrojanImageNoiseGenerator(NoiseGenerator):
         resized = trojan_img.resize((new_w, new_h), resample=self._RESIZE)
 
         min_r, max_r = self.rotation
-        angle_deg = random.uniform(min_r, max_r) * 360.0
-        rotated = resized.rotate(angle=angle_deg, resample=self._ROTATE, expand=True)
+        angle_deg = random.uniform(min_r, max_r)
 
-        trojan_np = self._pil_to_np_matching_sample(rotated, sample_c)
+        if resized.mode == "L":
+            fill = 0
+        else:
+            fill = self._estimate_border_fillcolor(resized)
+
+        try:
+            rotated = resized.rotate(angle=angle_deg, resample=self._ROTATE, expand=True, fillcolor=fill)
+        except TypeError:
+            rotated = resized.rotate(angle=angle_deg, resample=self._ROTATE, expand=True)
+
+        ones = Image.new("L", resized.size, 255)
+        try:
+            mask_im = ones.rotate(angle=angle_deg, resample=Image.NEAREST, expand=True, fillcolor=0)
+        except TypeError:
+            mask_im = ones.rotate(angle=angle_deg, resample=Image.NEAREST, expand=True)
+        mask_np = (np.asarray(mask_im, dtype=np.uint8) > 0)
+
+        trojan_np = self._pil_to_np_matching_sample(rotated, 1 if sample_c == 1 else 3)
+        self._last_mask_np = mask_np
         return [trojan_np]
 
-    # ----------------- helpers -----------------
+    def _composite_hard_overwrite(
+        self,
+        sample_np: np.ndarray,
+        trojan_np: np.ndarray,
+        pos_percent: Tuple[float, float],
+        coerce: bool,
+    ) -> np.ndarray:
+        sh, sw, sc = self._shape_info(sample_np)
+
+        if sc == 1:
+            base = Image.fromarray(sample_np.astype(np.uint8), mode="L")
+            canvas = np.zeros((sh, sw), dtype=np.uint8)
+            mask_canvas = np.zeros((sh, sw), dtype=bool)
+        elif sc == 3:
+            base = Image.fromarray(sample_np.astype(np.uint8), mode="RGB")
+            canvas = np.zeros((sh, sw, 3), dtype=np.uint8)
+            mask_canvas = np.zeros((sh, sw), dtype=bool)
+        elif sc == 4:
+            base = Image.fromarray(sample_np[:, :, :3].astype(np.uint8), mode="RGB")
+            canvas = np.zeros((sh, sw, 3), dtype=np.uint8)
+            mask_canvas = np.zeros((sh, sw), dtype=bool)
+        else:
+            raise ValueError("sample must have 1, 3, or 4 channels.")
+
+        trojan_img = self._np_to_pil(trojan_np)
+        trojan_img = self._convert_mode_to_match_sample(trojan_img, 1 if base.mode == "L" else 3)
+
+        fw, fh = trojan_img.size
+        mask_np = self._last_mask_np
+        if mask_np is None:
+            if base.mode == "L":
+                mask_np = np.ones((fh, fw), dtype=bool)
+            else:
+                mask_np = np.ones((fh, fw), dtype=bool)
+
+        px_pct, py_pct = pos_percent
+        center_x = int(round((px_pct / 100.0) * sw))
+        center_y_from_bottom = int(round((py_pct / 100.0) * sh))
+        center_y = sh - center_y_from_bottom
+
+        x = center_x - fw // 2
+        y = center_y - fh // 2
+
+        if coerce:
+            x = max(0, min(x, sw - fw))
+            y = max(0, min(y, sh - fh))
+
+        x0 = max(0, x)
+        y0 = max(0, y)
+        x1 = min(sw, x + fw)
+        y1 = min(sh, y + fh)
+
+        if x0 < x1 and y0 < y1:
+            crop_left = x0 - x
+            crop_top = y0 - y
+            crop_right = crop_left + (x1 - x0)
+            crop_bottom = crop_top + (y1 - y0)
+
+            trojan_cropped = trojan_img.crop((crop_left, crop_top, crop_right, crop_bottom))
+            trojan_arr = np.asarray(trojan_cropped, dtype=np.uint8)
+
+            mask_crop = mask_np[crop_top:crop_bottom, crop_left:crop_right]
+
+            if base.mode == "L":
+                canvas[y0:y1, x0:x1] = trojan_arr
+                mask_canvas[y0:y1, x0:x1] = mask_crop
+            else:
+                canvas[y0:y1, x0:x1, :] = trojan_arr
+                mask_canvas[y0:y1, x0:x1] = mask_crop
+
+        a = self._current_alpha if self._current_alpha is not None else self.alpha
+        a = float(min(1.0, max(0.0, a)))
+
+        if sc == 1:
+            base_np = np.array(base, dtype=np.uint8, copy=True)
+            m = mask_canvas
+            if m.any():
+                b = base_np[m].astype(np.float32)
+                t = canvas[m].astype(np.float32)
+                base_np[m] = np.clip((1.0 - a) * b + a * t, 0, 255).astype(np.uint8)
+            return base_np
+        else:
+            base_np = np.array(base, dtype=np.uint8, copy=True)
+            m = mask_canvas
+            if m.any():
+                b = base_np[m].astype(np.float32)
+                t = canvas[m].astype(np.float32)
+                base_np[m] = np.clip((1.0 - a) * b + a * t, 0, 255).astype(np.uint8)
+            if sc == 3:
+                return base_np
+            else:
+                a_ch = np.full((sh, sw, 1), 255, dtype=np.uint8)
+                return np.concatenate([base_np, a_ch], axis=2)
 
     @staticmethod
     def _shape_info(arr: np.ndarray) -> Tuple[int, int, int]:
@@ -140,7 +244,7 @@ class TrojanImageNoiseGenerator(NoiseGenerator):
             elif c == 3:
                 return Image.fromarray(arr.astype(np.uint8), mode="RGB")
             elif c == 4:
-                return Image.fromarray(arr.astype(np.uint8), mode="RGBA")
+                return Image.fromarray(arr[:, :, :3].astype(np.uint8), mode="RGB")
         raise ValueError("trojan must be 2D or 3D uint8 array with 1/3/4 channels.")
 
     @staticmethod
@@ -148,107 +252,43 @@ class TrojanImageNoiseGenerator(NoiseGenerator):
         if sample_c == 1:
             if img.mode != "L":
                 img = img.convert("L")
-            out = np.asarray(img, dtype=np.uint8)
-            return out
+            return np.asarray(img, dtype=np.uint8)
         elif sample_c == 3:
             if img.mode != "RGB":
                 img = img.convert("RGB")
             return np.asarray(img, dtype=np.uint8)
         elif sample_c == 4:
-            if img.mode != "RGBA":
-                img = img.convert("RGBA")
+            if img.mode != "RGB":
+                img = img.convert("RGB")
             return np.asarray(img, dtype=np.uint8)
         else:
             raise ValueError("sample must have 1, 3, or 4 channels.")
 
     @staticmethod
     def _convert_mode_to_match_sample(img: Image.Image, sample_c: int) -> Image.Image:
-        if sample_c == 1 and img.mode != "L":
-            return img.convert("L")
-        if sample_c == 3 and img.mode != "RGB":
-            return img.convert("RGB")
-        if sample_c == 4 and img.mode != "RGBA":
-            base = img.convert("RGBA")
-            if img.mode == "RGB":
-                r, g, b = base.split()[:3]
-                a = Image.new("L", base.size, 255)
-                base = Image.merge("RGBA", (r, g, b, a))
-            return base
-        return img
-
-    # ----------------- NEW: compositing with percent position + alpha -----------------
-
-    def _composite_with_position_percent(
-        self,
-        sample_np: np.ndarray,
-        trojan_np: np.ndarray,
-        pos_percent: Tuple[float, float],
-        coerce: bool,
-        alpha_override: float,
-    ) -> np.ndarray:
-        """
-        Composite trojan onto sample.
-        pos_percent: (x%, y%) with 0,0 at bottom-left and 100,100 at top-right.
-        Anchor is top-left of the trojan at that (x%, y%) position.
-        If `coerce` is True, the trojan is shifted so it is fully inside the image.
-        If `coerce` is False, the trojan is cropped to the visible region.
-        alpha_override in [0,1] scales the trojan's alpha globally.
-        The returned array has the same channel count as `sample_np`.
-        """
-        sh, sw, sc = self._shape_info(sample_np)
-
-        # Convert arrays to PIL for compositing in RGBA space
-        if sc == 1:
-            base = Image.fromarray(sample_np.astype(np.uint8), mode="L").convert("RGBA")
-        elif sc == 3:
-            base = Image.fromarray(sample_np.astype(np.uint8), mode="RGB").convert("RGBA")
-        elif sc == 4:
-            base = Image.fromarray(sample_np.astype(np.uint8), mode="RGBA")
+        if sample_c == 1:
+            return img.convert("L") if img.mode != "L" else img
         else:
-            raise ValueError("sample must have 1, 3, or 4 channels.")
+            return img.convert("RGB") if img.mode != "RGB" else img
 
-        trojan_img = self._np_to_pil(trojan_np)
-        # Ensure overlay is RGBA to leverage alpha (synthetic opaque if none)
-        if trojan_img.mode != "RGBA":
-            trojan_img = trojan_img.convert("RGBA")
-
-        # Apply global alpha by scaling the A channel
-        if alpha_override < 1.0:
-            r, g, b, a = trojan_img.split()
-            a = a.point(lambda v: int(round(v * alpha_override)))
-            trojan_img = Image.merge("RGBA", (r, g, b, a))
-
-        fw, fh = trojan_img.size
-
-        # Position: (x%, y%) in [0,100], origin bottom-left.
-        px_pct, py_pct = pos_percent
-        x = int(round((px_pct / 100.0) * sw))
-        y_from_bottom = int(round((py_pct / 100.0) * sh))
-        y = sh - y_from_bottom - fh  # convert to top-left y (PIL coordinates)
-
-        if coerce:
-            # Shift to keep fully inside
-            x = max(0, min(x, sw - fw))
-            y = max(0, min(y, sh - fh))
-            base.paste(trojan_img, (x, y), trojan_img)
+    @staticmethod
+    def _estimate_border_fillcolor(img: Image.Image):
+        if img.mode not in ("L", "RGB"):
+            img = img.convert("RGB")
+        arr = np.asarray(img)
+        if img.mode == "L":
+            top = arr[0, :]
+            bottom = arr[-1, :]
+            left = arr[:, 0]
+            right = arr[:, -1]
+            border = np.concatenate([top, bottom, left, right], axis=0)
+            val = int(np.median(border))
+            return val
         else:
-            # Allow out-of-bounds; crop to visible intersection
-            x0, y0 = max(0, x), max(0, y)
-            x1, y1 = min(sw, x + fw), min(sh, y + fh)
-
-            if x0 < x1 and y0 < y1:
-                crop_left   = x0 - x
-                crop_top    = y0 - y
-                crop_right  = crop_left + (x1 - x0)
-                crop_bottom = crop_top + (y1 - y0)
-                trojan_cropped = trojan_img.crop((crop_left, crop_top, crop_right, crop_bottom))
-                base.paste(trojan_cropped, (x0, y0), trojan_cropped)
-            # else: completely out of view; return unchanged
-
-        # Convert back to sample's original channel count
-        if sc == 1:
-            return np.asarray(base.convert("L"), dtype=np.uint8)
-        elif sc == 3:
-            return np.asarray(base.convert("RGB"), dtype=np.uint8)
-        else:  # sc == 4
-            return np.asarray(base.convert("RGBA"), dtype=np.uint8)
+            top = arr[0, :, :]
+            bottom = arr[-1, :, :]
+            left = arr[:, 0, :]
+            right = arr[:, -1, :]
+            border = np.concatenate([top, bottom, left, right], axis=0)
+            med = np.median(border, axis=0)
+            return (int(med[0]), int(med[1]), int(med[2]))
