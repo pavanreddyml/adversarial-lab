@@ -16,7 +16,7 @@ def get_requirements(filename, exclude=None):
 
 setup(
     name="adversarial-lab",
-    version="0.0.3",
+    version="0.0.4",
     description="A unified library for performing adversarial attacks on ML models",
     long_description=open("README.md").read(
     ) if os.path.exists("README.md") else "",
