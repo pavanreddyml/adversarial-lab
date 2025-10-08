@@ -12,8 +12,8 @@ from adversarial_lab.core.losses import Loss, LossRegistry
 from adversarial_lab.analytics import AdversarialAnalytics, Tracker
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
-from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
 from adversarial_lab.core.gradient_estimator import GradientEstimator, DummyGradientEstimator
+from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing, PreprocessingFromFunction
 
 
 from adversarial_lab.core.noise_generators import NoiseGenerator, TensorNoiseGenerator, TextNoiseGenerator
@@ -179,6 +179,9 @@ class AdversarialAttackerBase(ABC):
         """
         if preprocessing is None:
             self.preprocessing = NoPreprocessing()
+        elif callable(preprocessing):
+            self.preprocessing = PreprocessingFromFunction(
+                preprocessing_function=preprocessing)
         elif isinstance(preprocessing, Preprocessing):
             self.preprocessing = preprocessing
         else:
