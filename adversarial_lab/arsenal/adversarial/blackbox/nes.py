@@ -1,4 +1,3 @@
-# File: nes_attack.py
 from typing import Optional, Literal, Dict, Any
 
 from ...attacks_base import AttacksBase

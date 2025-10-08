@@ -180,7 +180,7 @@ class AdversarialAttackerBase(ABC):
         if preprocessing is None:
             self.preprocessing = NoPreprocessing()
         elif callable(preprocessing):
-            self.preprocessing = PreprocessingFromFunction(
+            self.preprocessing = PreprocessingFromFunction.create(
                 preprocessing_function=preprocessing)
         elif isinstance(preprocessing, Preprocessing):
             self.preprocessing = preprocessing

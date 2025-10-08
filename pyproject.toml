@@ -23,6 +23,7 @@ dependencies = [
   "numpy==2.0.2",
   "plotly==6.0.1",
   "pandas==2.2.2",
+  "imageio"
 ]
 
 [project.urls]

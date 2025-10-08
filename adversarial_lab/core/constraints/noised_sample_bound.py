@@ -16,7 +16,9 @@ class PONoisedSampleBounding(PostOptimizationConstraint):
               *args,
               **kwargs
               ) -> None:
+
         min_allowed_noise = self.tensor_ops.sub(self.min_val, sample)
         max_allowed_noise = self.tensor_ops.sub(self.max_val, sample)
+
         clipped_value = self.tensor_ops.clip(noise, min_allowed_noise, max_allowed_noise)
         self.tensor_ops.assign(noise, clipped_value)
