@@ -59,6 +59,7 @@ class AdversarialAttackerBase(ABC):
                  efficient_mode_indexes: Optional[List[int]] = None,
                  gradient_estimator: Optional[GradientEstimator] = None,
                  verbose: int = 1,
+                 _yield: bool = False,
                  *args,
                  **kwargs
                  ) -> None:
@@ -125,6 +126,7 @@ class AdversarialAttackerBase(ABC):
         self.tensor_ops = TensorOps(framework=self.framework)
 
         self.verbose = verbose
+        self._yield = _yield
 
         self.progress_bar: Optional[tqdm] = None
 

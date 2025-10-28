@@ -40,6 +40,7 @@ class BlackBoxMisclassificationAttack(AdversarialAttackerBase):
                  callbacks: Optional[List[Callback]] = None,
                  verbose: int = 1,
                  max_queries: int = 10000,
+                 _yield: bool = False,
                  *args,
                  **kwargs) -> None:
         super().__init__(model=model,
@@ -52,6 +53,7 @@ class BlackBoxMisclassificationAttack(AdversarialAttackerBase):
                          callbacks=callbacks,
                          verbose=verbose,
                          max_queries=max_queries,
+                         _yield=_yield,
                          *args,
                          **kwargs)
 
@@ -89,6 +91,9 @@ class BlackBoxMisclassificationAttack(AdversarialAttackerBase):
             predictions=self.tensor_ops.remove_batch_dim(predictions),
             on_original=True,
         )
+
+        if self._yield:
+            yield self.noise_generator.get_noise(noise_meta), noise_meta
 
         for epoch in range(epochs):
             grads, jacobian, logits, preds = self.model.calculate_gradients(
@@ -140,6 +145,9 @@ class BlackBoxMisclassificationAttack(AdversarialAttackerBase):
                 true_class=true_class,
                 target_class=target_class,
             )
+
+            if self._yield:
+                yield self.noise_generator.get_noise(noise_meta), noise_meta
 
             if "stop_attack" in callbacks_data:
                 break

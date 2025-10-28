@@ -48,6 +48,7 @@ class WhiteBoxMisclassificationAttack(AdversarialAttackerBase):
                  verbose: int = 1,
                  efficient_mode: Optional[int] = None,
                  efficient_mode_indexes: Optional[List[int]] = None,
+                 _yield: bool = False,
                  *args,
                  **kwargs) -> None:
         super().__init__(model=model,
@@ -61,6 +62,7 @@ class WhiteBoxMisclassificationAttack(AdversarialAttackerBase):
                          verbose=verbose,
                          efficient_mode=efficient_mode,
                          efficient_mode_indexes=efficient_mode_indexes,
+                         _yield=_yield,
                          *args,
                          **kwargs)
 
@@ -113,6 +115,9 @@ class WhiteBoxMisclassificationAttack(AdversarialAttackerBase):
             predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=on_original,
         )
+
+        if self._yield:
+            yield self.noise_generator.get_noise(noise_meta), noise_meta
 
         for epoch in range(epochs):
             grads, jacobian, logits, preds = self.model.calculate_gradients(
@@ -168,6 +173,9 @@ class WhiteBoxMisclassificationAttack(AdversarialAttackerBase):
                 true_class=true_class,
                 target_class=target_class,
             )
+
+            if self._yield:
+                yield self.noise_generator.get_noise(noise_meta), noise_meta
 
             if "stop_attack" in callbacks_data:
                 break
